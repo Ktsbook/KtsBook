@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase XLSX Import</title>
+    <style>
+        /* General Styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 70px 0 0 0; /* Add top padding to prevent overlap */
+            background: linear-gradient(to bottom, #f0f8ff, #e6e6fa);
+            color: #333;
+            min-height: 100vh; /* Ensure body takes full height */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to the top of the viewport*/
+        }
+
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #00796b;
+            font-size: 24px;
+        }
+
+        .file-input-container {
+            margin-bottom: 20px;
+        }
+
+        .file-input-container input[type="file"] {
+            display: none;
+        }
+
+        .file-input-container label {
+            display: inline-block;
+            background-color: #00796b;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .file-input-container label:hover {
+            background-color: #004d40;
+        }
+
+        #importButton {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        #importButton:hover {
+            background-color: #2980b9;
+        }
+
+        #importButton:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .file-name {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        header {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: white;
+        }
+
+        nav {
+            display: flex;
+            gap: 15px;
+        }
+
+        nav button {
+            background-color: transparent;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        nav button:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+    </style>
+    <!-- Load SheetJS library -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, doc, updateDoc } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-firestore.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTqdLERRS66d9kRo1sDuo5dOdr5QxJBQg", // Replace with your Firebase API key
+            authDomain: "kata-book-8b8d1.firebaseapp.com",
+            projectId: "kata-book-8b8d1",
+            storageBucket: "kata-book-8b8d1.firebasestorage.app",
+            messagingSenderId: "195494952673",
+            appId: "1:195494952673:web:ca10b17627dc68d382c1a0"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const fileInput = document.getElementById('fileInput');
+        const importButton = document.getElementById('importButton');
+        const fileNameDisplay = document.getElementById('fileName');
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                fileNameDisplay.textContent = `Selected file: ${file.name}`;
+                importButton.disabled = false;
+            } else {
+                fileNameDisplay.textContent = '';
+                importButton.disabled = true;
+            }
+        });
+
+        importButton.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        console.log("XLSX object:", XLSX); // Debug: Check if XLSX is loaded
+
+                        // Read the XLSX file
+                        const data = new Uint8Array(event.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+
+                        // Get the first sheet
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+
+                        // Convert sheet to JSON
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                        // Process the data
+                        let successCount = 0;
+                        let errorCount = 0;
+                        let updateCount = 0;
+
+                        const headers = jsonData[0]; // First row is headers
+                        for (let i = 1; i < jsonData.length; i++) {
+                            const rowData = jsonData[i];
+                            const row = {};
+                            headers.forEach((header, index) => {
+                                row[header] = rowData[index];
+                            });
+
+                            // Skip rows with empty TLotNo
+                            if (!row.TLotNo) {
+                                console.warn('Skipping row with empty TLotNo:', row);
+                                errorCount++;
+                                continue;
+                            }
+
+                            try {
+                                const tLotNo = row.TLotNo;
+                                const tenderDate = row.TenderDate;
+
+                                // Check if the document already exists
+                                const q = query(
+                                    collection(db, 'Surya'),
+                                    where("TLotNo", "==", tLotNo),
+                                    where("TenderDate", "==", tenderDate)
+                                );
+                                const querySnapshot = await getDocs(q);
+
+                                if (querySnapshot.empty) {
+                                    // Add new document
+                                    await addDoc(collection(db, 'Surya'), row);
+                                    console.log('Document added:', row);
+                                    successCount++;
+                                } else {
+                                    // Update existing document
+                                    querySnapshot.forEach(async (document) => {
+                                        const docRef = doc(db, 'Surya', document.id);
+                                        await updateDoc(docRef, row);
+                                        console.log('Document updated:', row);
+                                        updateCount++;
+                                    });
+                                }
+                            } catch (error) {
+                                console.error('Error processing row:', row, error);
+                                errorCount++;
+                            }
+                        }
+
+                        alert(`Import completed. Added: ${successCount}, Updated: ${updateCount}, Errors: ${errorCount}`);
+                        window.location.href = "./Tender Report Records.html";
+                    } catch (error) {
+                        console.error("Error during XLSX processing:", error);
+                        alert("Error processing XLSX file. Please check the file format.");
+                    }
+                };
+                reader.readAsArrayBuffer(file); // Read the file as ArrayBuffer
+            }
+        });
+    </script>
+</head>
+<body>
+    <header>
+        <h1></h1>
+        <nav>
+            <button onclick="window.location.href='./Tender Report Records.html'">Tender Register</button>
+            <button onclick="window.location.href='./Kata Register.html'">Kata Register</button>
+            <button onclick="window.location.href='./Updloadtender.html'">Upload</button>
+        </nav>
+    </header>
+    <div class="container">
+        <h1>Import Tender Report</h1>
+        <div class="file-input-container">
+            <input type="file" id="fileInput" accept=".xlsx, .xls"> <!-- Accept XLSX and XLS files -->
+            <label for="fileInput">Choose Excel File</label>
+            <div id="fileName" class="file-name"></div>
+        </div>
+        <button id="importButton" disabled>Import</button>
+    </div>
+</body>
+</html>

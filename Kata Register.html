@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>View Records</title>
+  <style>
+    body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(to bottom, #f0f8ff, #e6e6fa);
+  color: #333;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  background-color: #3498db;
+  color: white;
+  padding: 10px 3px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  position: fixed;
+  width: 100%;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+nav {
+  display: flex;
+  gap: 15px;
+}
+
+nav button {
+  background-color: transparent;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.3s ease;
+}
+
+nav button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+main {
+  flex-grow: 1;
+  padding: 80px 20px 20px; /* Adjusted padding for fixed header */
+  overflow-y: auto; /* Allow scrolling */
+}
+
+h1 {
+  margin-bottom: 20px;
+  font-size: 20px;
+  text-align: left;
+  color: white;
+}
+
+#filter-controls, .table-controls {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+#filter-controls input, .table-controls input {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  flex-grow: 1;
+  margin-right: 10px;
+}
+
+#filter-controls button, .table-controls button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  border: 1px solid #ddd;
+}
+
+#data-table th, #data-table td {
+  border: 1px solid #ddd;
+  padding: 12px 15px;
+  text-align: left;
+}
+
+#data-table th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+}
+
+#data-table tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 5px;
+}
+
+.update-btn, .delete-btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.update-btn {
+  background-color: #27ae60;
+  color: white;
+}
+
+.delete-btn {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.update-btn:hover, .delete-btn:hover {
+  opacity: 0.9;
+}
+
+#filter-button:hover {
+  background-color: #2980b9;
+}
+
+/* Make the table scrollable */
+#records-container {
+  max-height: calc(100vh - 200px); /* Adjust height based on your layout */
+  
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: white;
+}
+.hide-buyer {
+    display: none;
+}
+  </style>
+</head>
+<body>
+  <!-- Header with Navigation Menu -->
+  <header>
+    <h1>Kata Register</h1>
+    <nav>
+      <button onclick="window.location.href='./Tender Report Records.html'">Tender Register</button>
+      <button onclick="window.location.href='./Kata Register.html'">Kata Register</button>
+      <button onclick="window.location.href='./Updloadtender.html'">Upload </button>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div id="filter-controls">
+      <input type="text" id="filter-date" placeholder="Enter Tender Date...">
+      <button id="filter-button">Filter</button>
+    </div>
+    <div class="table-controls">
+      <input type="text" id="search" placeholder="Search...">
+    </div>
+    <div id="records-container">
+      <table id="data-table">
+        <thead>
+          <tr>
+           
+            <th>Inward No.</th>
+            <th>Farmer Name</th>
+            <th>Lot No.</th>
+            <th class="hide-buyer">Bags</th>
+          
+            <th class="hide-buyer">Buyer Name</th>
+            <th class="hide-buyer">Tender Date</th>
+            <th class="hide-buyer">Item Name</th>
+            <th>P Bag</th>
+            <th>P Bod</th>
+            <th>G Bag</th>
+            <th>G Bod</th>
+            <th>Rate</th>
+            <th>Net Weight</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="records-table-body">
+          <!-- Records will be dynamically inserted here -->
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-app.js";
+    import { getFirestore, collection, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-firestore.js";
+  
+    const firebaseConfig = {
+      apiKey: "AIzaSyDTqdLERRS66d9kRo1sDuo5dOdr5QxJBQg",
+      authDomain: "kata-book-8b8d1.firebaseapp.com",
+      projectId: "kata-book-8b8d1",
+      storageBucket: "kata-book-8b8d1.appspot.com",
+      messagingSenderId: "195494952673",
+      appId: "1:195494952673:web:ca10b17627dc68d382c1a0"
+    };
+  
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+  
+    async function loadRecords() {
+      const recordsTableBody = document.getElementById("records-table-body");
+      recordsTableBody.innerHTML = "<tr><td colspan='14'>Loading records...</td></tr>";
+  
+      try {
+        const querySnapshot = await getDocs(collection(db, "Ambar"));
+        const data = [];
+        querySnapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() });
+        });
+  
+        const filterDateInput = document.getElementById("filter-date");
+        const filterButton = document.getElementById("filter-button");
+        const searchInput = document.getElementById("search");
+  
+        let filteredData = [];
+  
+        // Set the system date as a string in DD-MM-YYYY format
+        const today = new Date();
+        const formattedDate = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
+        filterDateInput.value = formattedDate;
+  
+        function groupByBuyerName(data) {
+          const groupedData = {};
+          data.forEach((record) => {
+            const buyerName = record.KBuyerName || 'Unknown';
+            if (!groupedData[buyerName]) {
+              groupedData[buyerName] = [];
+            }
+            groupedData[buyerName].push(record);
+          });
+          return groupedData;
+        }
+  
+        function displayTableData() {
+          recordsTableBody.innerHTML = "";
+  
+          const groupedData = groupByBuyerName(filteredData);
+  
+          Object.keys(groupedData).forEach((buyerName) => {
+            const buyerRecords = groupedData[buyerName];
+            const buyerRow = document.createElement("tr");
+            buyerRow.innerHTML = `<td colspan="14" style="background-color: #f2f2f2; font-weight: bold;">Buyer: ${buyerName}</td>`;
+            recordsTableBody.appendChild(buyerRow);
+  
+            buyerRecords.forEach((record) => {
+              const recordRow = document.createElement("tr");
+              recordRow.innerHTML = `
+               
+                <td>${record.KInwardNo || 'N/A'}</td>
+                <td>${record.KFarmerName || 'N/A'}</td>
+                 <td>${record.KLotNo || 'N/A'}</td>
+                <td class="hide-buyer">${record.KBags || 'N/A'}</td>
+              
+                <td class="hide-buyer">${record.KBuyerName || 'N/A'}</td>
+                <td class="hide-buyer">${record.KenderDate || 'N/A'}</td>
+                <td class="hide-buyer">${record.KItemName || 'N/A'}</td>
+
+                 <td>${record.pBagCount || 'N/A'}</td>
+                  <td>${record.pBodCount || 'N/A'}</td>
+                   <td>${record.gBagCount || 'N/A'}</td>
+                    <td>${record.gBodCount || 'N/A'}</td>
+                     <td>${record.netWeight || 'N/A'}</td>
+                       <td>${record.KRate || 'N/A'}</td>
+                     
+
+                
+                <td>
+                  <div class="action-buttons">
+                    <button class="update-btn" data-id="${record.id}">Update</button>
+                    <button class="delete-btn" data-id="${record.id}">Delete</button>
+                  </div>
+                </td>
+              `;
+              recordsTableBody.appendChild(recordRow);
+            });
+          });
+  
+          attachEditListeners();
+        }
+  
+        function filterTableData() {
+          const filterDate = filterDateInput.value.trim().toLowerCase();
+          const searchTerm = searchInput.value.trim().toLowerCase();
+  
+          filteredData = data.filter((record) => {
+            const tenderDate = record.KenderDate ? record.KenderDate.toLowerCase() : '';
+            const searchValues = Object.values(record).map((val) => String(val).toLowerCase());
+  
+            // Filter by Tender Date and Search Term
+            if (filterDate !== "" && searchTerm !== "") {
+              return tenderDate.includes(filterDate) && searchValues.some((val) => val.includes(searchTerm));
+            }
+            // Filter by Tender Date only
+            else if (filterDate !== "") {
+              return tenderDate.includes(filterDate);
+            }
+            // Filter by Search Term only
+            else {
+              return searchValues.some((val) => val.includes(searchTerm));
+            }
+          });
+  
+          if (filteredData.length === 0) {
+            recordsTableBody.innerHTML = "<tr><td colspan='14'>No records found.</td></tr>";
+          } else {
+            displayTableData();
+          }
+        }
+  
+        function attachEditListeners() {
+          document.querySelectorAll(".delete-btn").forEach((button) => {
+            button.addEventListener("click", async (event) => {
+              const docId = event.target.getAttribute("data-id");
+              if (confirm("Are you sure you want to delete this record?")) {
+                await deleteRecord(docId);
+                loadRecords(); // Reload records after deletion
+              }
+            });
+          });
+  
+          document.querySelectorAll(".update-btn").forEach((button) => {
+            button.addEventListener("click", (event) => {
+              const docId = event.target.getAttribute("data-id");
+              window.location.href = `./Kata Register Update.html?docId=${docId}`; // Redirect to edit page
+            });
+          });
+        }
+  
+        // Add input event listener for dynamic searching
+        searchInput.addEventListener("input", filterTableData);
+  
+        filterButton.addEventListener("click", filterTableData);
+  
+        // Automatically filter data with the system date when the page loads
+        filterTableData();
+  
+      } catch (error) {
+        console.error("Error loading records:", error);
+        recordsTableBody.innerHTML = "<tr><td colspan='14'>Error loading records. Please try again.</td></tr>";
+      }
+    }
+  
+    async function deleteRecord(docId) {
+      try {
+        await deleteDoc(doc(db, "Ambar", docId));
+        alert("Record deleted successfully!");
+      } catch (error) {
+        console.error("Error deleting document:", error);
+        alert("Error deleting record. Please try again.");
+      }
+    }
+  
+    window.onload = loadRecords;
+  </script>
+</body>
+</html>

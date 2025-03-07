@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Firebase Records</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to bottom, #f0f8ff, #e6e6fa);
+            color: #333;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 3px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: white;
+        }
+
+        nav {
+            display: flex;
+            gap: 15px;
+        }
+
+        nav button {
+            background-color: transparent;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        nav button:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        main {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+            text-align: left;
+        }
+
+        #data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        #data-table th, #data-table td {
+            border: 1px solid #ddd;
+            padding: 12px 15px;
+            text-align: left;
+        }
+
+        #data-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+
+        #data-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        .edit-row {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .edit-row:hover {
+            background-color: #219653;
+        }
+
+        .info-row {
+            background-color: #e0f7fa;
+            font-weight: bold;
+        }
+
+        .info-row td {
+            text-align: left;
+        }
+
+        .info-row span {
+            float: right;
+        }
+        .hide-buyer {
+    display: none;
+}
+    </style>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-app.js";
+        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTqdLERRS66d9kRo1sDuo5dOdr5QxJBQg",
+            authDomain: "kata-book-8b8d1.firebaseapp.com",
+            projectId: "kata-book-8b8d1",
+            storageBucket: "kata-book-8b8d1.firebasestorage.app",
+            messagingSenderId: "195494952673",
+            appId: "1:195494952673:web:ca10b17627dc68d382c1a0"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function loadDataIntoTable(filterTenderDate, filterBuyerName) {
+            try {
+                const querySnapshot = await getDocs(collection(db, 'Surya'));
+                const data = [];
+                querySnapshot.forEach((doc) => {
+                    data.push({ id: doc.id, ...doc.data() });
+                });
+
+                const table = document.getElementById("data-table");
+                const tableBody = table.querySelector("tbody");
+                tableBody.innerHTML = "";
+
+                let filteredData = data.filter(item => item.TenderDate === filterTenderDate && item.TBuyerName === filterBuyerName);
+
+                if (filteredData.length > 0) {
+                    // Show Buyer Name, Tender Date, and Item Name in the info row
+                    const infoRow = document.createElement("tr");
+                    infoRow.className = "info-row";
+                    infoRow.innerHTML = `
+                        <td colspan="9">
+                            Buyer Name: ${filteredData[0].TBuyerName || 'N/A'}
+                            <span>Tender Date: ${filteredData[0].TenderDate || 'N/A'}, Item Name: ${filteredData[0].ItemName || 'N/A'}</span>
+                        </td>
+                    `;
+                    table.insertBefore(infoRow, table.firstChild); // Insert before thead
+
+                    // Show table records
+                    filteredData.forEach(item => {
+                        const row = document.createElement("tr");
+                        row.innerHTML = `
+                            <td>${item.TLotNo || 'N/A'}</td>
+                            <td>${item.TInwardNo || 'N/A'}</td>
+                            <td>${item.TFarmerName || 'N/A'}</td>
+                            <td>${item.TBags || 'N/A'}</td>
+                            <td>${item.TRate || 'N/A'}</td>
+                            <td class="hide-buyer">${item.TBuyerName || 'N/A'}</td>
+                            <td class="hide-buyer">${item.TenderDate || 'N/A'}</td>
+                            <td class="hide-buyer">${item.ItemName || 'N/A'}</td>
+                            <td><button class="edit-row" data-id="${item.id}">Edit</button></td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                }
+
+                attachEditRowListeners();
+
+            } catch (error) {
+                console.error("Error loading data to table", error);
+            }
+        }
+
+        function attachEditRowListeners() {
+            document.querySelectorAll('.edit-row').forEach(button => {
+                button.addEventListener('click', function() {
+                    const id = this.dataset.id;
+                    window.location.href = `./KataEntryA.html?docId=${id}`;
+                });
+            });
+            
+            
+        }
+
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                tenderDate: params.get('tenderDate'),
+                buyerName: params.get('buyerName')
+            };
+        }
+
+        window.onload = function() {
+            const params = getUrlParams();
+            loadDataIntoTable(params.tenderDate, params.buyerName);
+        };
+    </script>
+</head>
+<body>
+    <header>
+        <h1></h1>
+        <nav>
+            <button onclick="window.location.href='./Tender Report Records.html'">Tender Register</button>
+            <button onclick="window.location.href='./Kata Register.html'">Kata Register</button>
+            <button onclick="window.location.href='./Updloadtender.html'">Upload </button>
+        </nav>
+    </header>
+    <main>
+        <table id="data-table">
+            <thead>
+                <tr>
+                    <th>Lot No.</th>
+                    <th>Inward No.</th>
+                    <th>Farmer Name</th>
+                    <th>Bags</th>
+                    <th>Rate</th>
+                    <th class="hide-buyer">Buyer Name</th>
+                    <th class="hide-buyer">Tender Date</th>
+                    <th class="hide-buyer">Item Name</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </main>
+</body>
+</html>
